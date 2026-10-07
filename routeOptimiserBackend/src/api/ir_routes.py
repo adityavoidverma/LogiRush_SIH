@@ -118,6 +118,7 @@ def rag_query():
             "answer":            rag_result["answer"],
             "risk_level":        rag_result["risk_level"],
             "grounded":          rag_result["grounded"],
+            "provider":          rag_result.get("provider"),
             "evidence_used":     rag_result["evidence_used"],
             "note":              rag_result.get("note"),
             "route_recommendation": route_rec,

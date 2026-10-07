@@ -11,6 +11,15 @@ import sys
 import threading
 import time
 
+# Load .env file if present (local dev / demo). Never commits secrets — .env is gitignored.
+try:
+    from dotenv import load_dotenv
+    import pathlib
+    _env_file = pathlib.Path(__file__).parent / ".env"
+    load_dotenv(dotenv_path=_env_file)
+except ImportError:
+    pass
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",

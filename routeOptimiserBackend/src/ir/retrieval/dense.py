@@ -25,13 +25,24 @@ if TYPE_CHECKING:
 logger = logging.getLogger("ir.dense")
 
 _IMPORT_ERROR: Exception | None = None
-try:
-    import numpy as np
-    from sentence_transformers import SentenceTransformer
-    _HAS_ST = True
-except ImportError as _e:
-    _HAS_ST = False
-    _IMPORT_ERROR = _e
+_HAS_ST: bool = False
+
+def _try_import():
+    """Attempt to import sentence_transformers at call time, not module load time.
+    Returns (SentenceTransformer_class_or_None, success_bool).
+    """
+    try:
+        from sentence_transformers import SentenceTransformer as ST  # type: ignore
+        import numpy  # noqa: F401 — verify numpy is usable too
+        return ST, True
+    except Exception as e:
+        logger.warning(
+            "Dense retrieval unavailable: %s. "
+            "Hybrid search will use BM25 + TF-IDF only. "
+            "To enable: pip install sentence-transformers torch",
+            e,
+        )
+        return None, False
 
 
 class DenseRetriever:
@@ -47,17 +58,13 @@ class DenseRetriever:
         self._embeddings = None     # numpy array shape (N, dim)
         self._ready = False
 
-        if not _HAS_ST:
-            logger.warning(
-                "sentence-transformers not installed (%s). "
-                "Dense retrieval disabled — install it with: "
-                "pip install sentence-transformers",
-                _IMPORT_ERROR,
-            )
+        ST, ok = _try_import()
+        if not ok or ST is None:
+            self._model = None
             return
 
         try:
-            self._model = SentenceTransformer(model_name)
+            self._model = ST(model_name)
             logger.info("Loaded embedding model: %s", model_name)
         except Exception as e:  # pragma: no cover
             logger.warning("Failed to load embedding model %s: %s", model_name, e)
@@ -65,17 +72,24 @@ class DenseRetriever:
 
     def build(self, documents: list["IRDocument"]) -> "DenseRetriever":
         """Encode all documents and store embeddings."""
-        if not _HAS_ST or self._model is None:
+        if self._model is None:
+            return self
+
+        _, ok = _try_import()
+        if not ok:
             return self
 
         self._docs = documents
         texts = [f"{d.title}. {d.text}" for d in documents]
         logger.info("Encoding %d documents with %s …", len(texts), self._model_name)
-        self._embeddings = self._model.encode(
-            texts, show_progress_bar=False, batch_size=64, normalize_embeddings=True
-        )
-        self._ready = True
-        logger.info("Dense index built: %d vectors", len(self._docs))
+        try:
+            self._embeddings = self._model.encode(
+                texts, show_progress_bar=False, batch_size=64, normalize_embeddings=True
+            )
+            self._ready = True
+            logger.info("Dense index built: %d vectors", len(self._docs))
+        except Exception as e:  # pragma: no cover
+            logger.warning("Dense encoding failed: %s", e)
         return self
 
     def query(self, query_text: str, top_k: int = 10) -> list[tuple[str, float]]:
@@ -87,7 +101,7 @@ class DenseRetriever:
         list of (doc_id, score) sorted by score descending.  Score in [0, 1].
         Returns [] if model is unavailable.
         """
-        if not self._ready or self._embeddings is None:
+        if not self._ready or self._embeddings is None or self._model is None:
             return []
 
         try:

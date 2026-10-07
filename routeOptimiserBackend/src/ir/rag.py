@@ -2,10 +2,10 @@
 """
 Retrieval-Augmented Generation layer.
 
-Grounds the LLM answer in the evidence retrieved by the IR engine.
-Falls back gracefully when no LLM key is configured:
-  - Still returns the evidence bundle and route recommendation.
-  - Notes that grounded generation is unavailable.
+Provider priority (first one with a configured key wins):
+  1. Groq  — free tier, fast, llama-3.3-70b-versatile
+  2. OpenAI — gpt-4o-mini (if OPENAI_API_KEY set)
+  3. Structured fallback — no LLM, built from retrieved evidence
 
 The LLM prompt enforces:
   - Only use supplied evidence for factual claims.
@@ -22,10 +22,6 @@ import os
 from src.ir.schemas import EvidenceBundle
 
 logger = logging.getLogger("ir.rag")
-
-# ── Supported providers ────────────────────────────────────────────────
-# The system tries OpenAI first, then a simple HTTP fallback.
-# If neither is available, we return a structured non-LLM response.
 
 _PROMPT_TEMPLATE = """\
 You are LogiRush, a logistics risk advisor for India.
@@ -70,8 +66,43 @@ def _format_evidence(bundle: EvidenceBundle, top_n: int = 5) -> str:
     return "\n".join(lines) if lines else "No relevant evidence found."
 
 
+# ── Provider 1: Groq (free tier) ──────────────────────────────────────
+# Model preference order — tries each until one succeeds.
+_GROQ_MODELS = [
+    "qwen/qwen3.8-27b",
+    "openai/gpt-oss-20b",
+    "openai/gpt-oss-120b",
+]
+
+def _call_groq(prompt: str) -> str | None:
+    api_key = os.environ.get("GROQ_API_KEY", "").strip()
+    if not api_key:
+        return None
+    try:
+        from groq import Groq  # type: ignore
+        client = Groq(api_key=api_key)
+        for model in _GROQ_MODELS:
+            try:
+                resp = client.chat.completions.create(
+                    model=model,
+                    messages=[{"role": "user", "content": prompt}],
+                    max_tokens=400,
+                    temperature=0.2,
+                )
+                answer = resp.choices[0].message.content.strip()
+                logger.info("Groq LLM answered via %s (%d chars)", model, len(answer))
+                return answer
+            except Exception as model_err:
+                logger.warning("Groq model %s failed: %s — trying next", model, model_err)
+        return None
+    except Exception as e:
+        logger.warning("Groq call failed: %s", e)
+        return None
+
+
+# ── Provider 2: OpenAI ────────────────────────────────────────────────
 def _call_openai(prompt: str) -> str | None:
-    api_key = os.environ.get("OPENAI_API_KEY", "")
+    api_key = os.environ.get("OPENAI_API_KEY", "").strip()
     if not api_key:
         return None
     try:
@@ -83,12 +114,35 @@ def _call_openai(prompt: str) -> str | None:
             max_tokens=400,
             temperature=0.2,
         )
-        return resp.choices[0].message.content.strip()
+        answer = resp.choices[0].message.content.strip()
+        logger.info("OpenAI LLM answered (%d chars)", len(answer))
+        return answer
     except Exception as e:
         logger.warning("OpenAI call failed: %s", e)
         return None
 
 
+def _call_llm(prompt: str) -> tuple[str | None, str]:
+    """
+    Try LLM providers in order of preference.
+
+    Returns
+    -------
+    (answer_text_or_None, provider_name)
+    """
+    answer = _call_groq(prompt)
+    if answer:
+        # figure out which model actually answered (logged above)
+        return answer, "groq"
+
+    answer = _call_openai(prompt)
+    if answer:
+        return answer, "openai/gpt-4o-mini"
+
+    return None, "none"
+
+
+# ── Public entry point ────────────────────────────────────────────────
 def generate_answer(bundle: EvidenceBundle) -> dict:
     """
     Generate a grounded answer from the evidence bundle.
@@ -96,9 +150,10 @@ def generate_answer(bundle: EvidenceBundle) -> dict:
     Returns
     -------
     dict with keys:
-      - answer        : str (LLM answer or structured fallback)
-      - grounded      : bool (True if LLM was used)
-      - evidence_used : list of doc IDs used
+      - answer        : str
+      - grounded      : bool (True if an LLM was used)
+      - provider      : str  (which LLM was used, or "none")
+      - evidence_used : list[str]
       - risk_level    : "CRITICAL" | "HIGH" | "MEDIUM" | "LOW" | "UNKNOWN"
     """
     parsed = bundle.parsed
@@ -115,30 +170,33 @@ def generate_answer(bundle: EvidenceBundle) -> dict:
 
     evidence_ids = [r.document.id for r in bundle.results[:5]]
 
-    # Try LLM
-    llm_answer = _call_openai(prompt)
+    llm_answer, provider = _call_llm(prompt)
+
     if llm_answer:
-        risk_level = _infer_risk(llm_answer, bundle)
         return {
             "answer":        llm_answer,
             "grounded":      True,
+            "provider":      provider if provider != "none" else "groq",
             "evidence_used": evidence_ids,
-            "risk_level":    risk_level,
+            "risk_level":    _infer_risk(llm_answer, bundle),
         }
 
-    # Structured fallback (no LLM available)
+    # Structured fallback
     risk_level = _infer_risk_from_evidence(bundle)
-    answer = _structured_fallback(bundle, risk_level)
     return {
-        "answer":        answer,
+        "answer":        _structured_fallback(bundle, risk_level),
         "grounded":      False,
+        "provider":      "none",
         "evidence_used": evidence_ids,
         "risk_level":    risk_level,
-        "note":          "Grounded LLM generation is unavailable (no OPENAI_API_KEY). "
-                         "This answer is generated from retrieved evidence.",
+        "note": (
+            "LLM generation unavailable — set GROQ_API_KEY (free at console.groq.com) "
+            "or OPENAI_API_KEY to enable grounded answers."
+        ),
     }
 
 
+# ── Helpers ───────────────────────────────────────────────────────────
 def _infer_risk(llm_text: str, bundle: EvidenceBundle) -> str:
     t = llm_text.upper()
     for level in ("CRITICAL", "HIGH", "MEDIUM", "LOW"):
@@ -148,7 +206,6 @@ def _infer_risk(llm_text: str, bundle: EvidenceBundle) -> str:
 
 
 def _infer_risk_from_evidence(bundle: EvidenceBundle) -> str:
-    """Derive a risk level from top evidence severity without an LLM."""
     if not bundle.results:
         return "UNKNOWN"
     severity_order = {"critical": 4, "high": 3, "medium": 2, "low": 1}
@@ -160,13 +217,9 @@ def _infer_risk_from_evidence(bundle: EvidenceBundle) -> str:
 
 
 def _structured_fallback(bundle: EvidenceBundle, risk_level: str) -> str:
-    """
-    Build a structured answer from retrieved evidence when no LLM is available.
-    """
     parsed = bundle.parsed
-    origin = parsed.get("origin", "origin")
+    origin      = parsed.get("origin", "origin")
     destination = parsed.get("destination", "destination")
-    cargo = parsed.get("cargo", "general cargo")
 
     if not bundle.results:
         return (
@@ -174,8 +227,8 @@ def _structured_fallback(bundle: EvidenceBundle, risk_level: str) -> str:
             f"No disruption data could be retrieved for the {origin} → {destination} corridor."
         )
 
-    top = bundle.results[0]
-    doc = top.document
+    top  = bundle.results[0]
+    doc  = top.document
     citations = ", ".join(f"[{r.document.id}]" for r in bundle.results[:3])
 
     action_map = {
