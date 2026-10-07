@@ -24,5 +24,15 @@
     "cd routeOptimiserBackend && python -m pytest -xvs (run all backend tests to ensure IR engine still works)"
   ],
   "blocked_reason": null,
-  "findings": "Successfully integrated corpus_generator.py into corpus.py. The build_corpus() function now returns 1023 documents (23 original SEED_DOCUMENTS + 1000 generated documents). Note: The spec mentioned 24 seed documents, but the actual corpus contains 23 (DOC_F001 through DOC_B004). The integration is deterministic, preserves document order (seeds first, then generated), and correctly appends live incidents with LIVE provenance. All acceptance criteria met: first 23 docs are seeds, docs 24-1023 are generated with GEN_ prefix, multiple calls produce identical results, and the IR engine imports and initializes successfully with the expanded corpus."
+  "findings": "Successfully integrated corpus_generator.py into corpus.py. The build_corpus() function now returns 1023 documents (23 original SEED_DOCUMENTS + 1000 generated documents). Note: The spec mentioned 24 seed documents, but the actual corpus contains 23 (DOC_F001 through DOC_B004). The integration is deterministic, preserves document order (seeds first, then generated), and correctly appends live incidents with LIVE provenance. All acceptance criteria met: first 23 docs are seeds, docs 24-1023 are generated with GEN_ prefix, multiple calls produce identical results, and the IR engine imports and initializes successfully with the expanded corpus.",
+  "integration_verification": {
+    "status": "verified",
+    "backend_tests": "206 tests passed, 0 failures",
+    "frontend_build": "success - vite build completed without errors",
+    "corpus_size": "1023 documents (23 seed + 1000 generated)",
+    "corpus_composition": "verified - first 23 docs are seeds (DOC_F001 etc), docs 24-1023 are generated (GEN_ prefix)",
+    "deterministic_generation": "verified - multiple calls produce identical corpus",
+    "ir_engine_startup": "success - IR engine indexed 1023 documents in 80.08s",
+    "live_incidents_append": "verified in code - live incidents appended after generated docs with LIVE provenance"
+  }
 }

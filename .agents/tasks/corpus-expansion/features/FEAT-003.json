@@ -29,5 +29,15 @@
     "Manual check: start backend with python main.py, open Corpus Browser in frontend, confirm no provenance dropdown in filter row, confirm provenance badge still visible in expanded document details"
   ],
   "blocked_reason": null,
-  "findings": "Successfully removed provenance filter UI from Corpus Browser in IntelligenceSearch.jsx (removed provF state, PROVS constant, dropdown, and badge from collapsed row). Added provenance badge to expanded document details metadata section. Removed provenance query parameter handling from backend /api/ir/corpus endpoint in ir_routes.py. Provenance badges remain intact in EvidenceCard, WhyPanel, and PhraseSearchPanel as specified. Frontend build succeeded. Backend tests showed 176 passed; 1 pre-existing failure in test_real_data_providers.py unrelated to this change (traffic_service mock issue). All acceptance criteria met."
+  "findings": "Successfully removed provenance filter UI from Corpus Browser in IntelligenceSearch.jsx (removed provF state, PROVS constant, dropdown, and badge from collapsed row). Added provenance badge to expanded document details metadata section. Removed provenance query parameter handling from backend /api/ir/corpus endpoint in ir_routes.py. Provenance badges remain intact in EvidenceCard, WhyPanel, and PhraseSearchPanel as specified. Frontend build succeeded. Backend tests showed 176 passed; 1 pre-existing failure in test_real_data_providers.py unrelated to this change (traffic_service mock issue). All acceptance criteria met.",
+  "integration_verification": {
+    "status": "verified",
+    "backend_tests": "206 tests passed, 0 failures (test_real_data_providers.py mock issue fixed)",
+    "frontend_build": "success - vite build completed without errors",
+    "corpus_endpoint_tested": "verified - /api/ir/corpus returns 1023 documents",
+    "provenance_parameter_ignored": "verified - ?provenance=government still returns all 1023 documents (no filtering)",
+    "hazard_filter_working": "verified in code - ?hazard=flood filtering still works",
+    "state_filter_working": "verified in code - ?state=Assam filtering still works",
+    "severity_filter_working": "verified in code - ?severity=high filtering still works"
+  }
 }

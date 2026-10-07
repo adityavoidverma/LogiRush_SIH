@@ -137,9 +137,9 @@ class TestRealTimeNERDataProvider(unittest.TestCase):
     """Test the unified real-time data provider."""
 
     @patch('src.data_processing.real_data_provider.OSMRoadNetworkFetcher')
-    @patch('src.data_processing.real_data_provider.imd_weather_provider')
-    @patch('src.data_processing.real_data_provider.traffic_service')
-    def test_provider_integrates_all_sources(self, mock_traffic, mock_weather, mock_osm_class):
+    @patch('src.data_processing.traffic_provider.traffic_service')
+    @patch('src.data_processing.imd_weather_provider.imd_weather_provider')
+    def test_provider_integrates_all_sources(self, mock_weather, mock_traffic, mock_osm_class):
         """Test that provider integrates all real-time sources."""
         from src.data_processing.real_data_provider import RealTimeNERDataProvider
         
@@ -376,10 +376,10 @@ class TestFullIntegration(unittest.TestCase):
     @patch('src.data_processing.real_data_provider.OSMRoadNetworkFetcher')
     @patch('src.data_processing.real_data_provider.ElevationFetcher')
     @patch('src.data_processing.real_data_provider.GDACSDisasterFetcher')
-    @patch('src.data_processing.real_data_provider.imd_weather_provider')
-    @patch('src.data_processing.real_data_provider.traffic_service')
+    @patch('src.data_processing.traffic_provider.traffic_service')
+    @patch('src.data_processing.imd_weather_provider.imd_weather_provider')
     def test_end_to_end_data_flow(
-        self, mock_traffic, mock_weather, mock_gdacs_class,
+        self, mock_weather, mock_traffic, mock_gdacs_class,
         mock_elevation_class, mock_osm_class
     ):
         """Test complete data flow from APIs to segment features."""
