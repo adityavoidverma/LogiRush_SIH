@@ -5,7 +5,7 @@ import { useSync } from "../context/SyncContext";
 import { useAuth } from "../context/AuthContext";
 import { Spinner } from "./ui";
 import {
-  IconAlert, IconClose, IconDashboard, IconMap, IconMenu, IconReport, IconRoute, IconTruck,
+  IconAlert, IconClose, IconDashboard, IconMap, IconMenu, IconReport, IconRoute, IconSearch, IconTruck,
 } from "./icons";
 import logoUrl from "../assets/logo-small.png";
 
@@ -25,19 +25,21 @@ import logoUrl from "../assets/logo-small.png";
 */
 
 const NAV = [
-  { to: "/dashboard", label: "Overview", Icon: IconDashboard },
-  { to: "/accessibility-map", label: "Network", Icon: IconMap },
-  { to: "/shipment-planner", label: "Plan", Icon: IconRoute },
-  { to: "/shipments", label: "Convoys", Icon: IconTruck },
-  { to: "/incidents", label: "Review", Icon: IconAlert },
-  { to: "/report-incident", label: "Report", Icon: IconReport },
+  { to: "/search",            label: "Search",   Icon: IconSearch },
+  { to: "/dashboard",         label: "Overview", Icon: IconDashboard },
+  { to: "/accessibility-map", label: "Network",  Icon: IconMap },
+  { to: "/shipment-planner",  label: "Plan",     Icon: IconRoute },
+  { to: "/shipments",         label: "Convoys",  Icon: IconTruck },
+  { to: "/incidents",         label: "Review",   Icon: IconAlert },
+  { to: "/report-incident",   label: "Report",   Icon: IconReport },
 ];
 
 const SECONDARY = [
+  { to: "/evaluation",   label: "IR Evaluation" },
   { to: "/data-sources", label: "Where this data comes from" },
-  { to: "/", label: "Cross-border optimiser" },
-  { to: "/about", label: "About" },
-  { to: "/contact", label: "Contact" },
+  { to: "/",             label: "Cross-border optimiser" },
+  { to: "/about",        label: "About" },
+  { to: "/contact",      label: "Contact" },
 ];
 
 /* Who is signed in, and what that lets them do. An operations console should never leave

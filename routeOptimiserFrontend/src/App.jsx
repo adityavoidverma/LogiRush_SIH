@@ -22,6 +22,8 @@ import Home from "./pages/Home";
   navigation costs one request, not a waterfall.
 */
 const About = lazy(() => import("./pages/About"));
+const IntelligenceSearch = lazy(() => import("./pages/IntelligenceSearch"));
+const EvaluationDashboard = lazy(() => import("./pages/EvaluationDashboard"));
 const Contact = lazy(() => import("./pages/Contact"));
 const Login = lazy(() => import("./pages/Login"));
 const Signup = lazy(() => import("./pages/Signup"));
@@ -58,6 +60,8 @@ const App = () => (
           <Suspense fallback={<RouteFallback />}>
             <Routes>
               {/* NER Logistics Intelligence Platform (SIH) */}
+              <Route path="/search" element={<IntelligenceSearch />} />
+              <Route path="/evaluation" element={<EvaluationDashboard />} />
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/accessibility-map" element={<AccessibilityMap />} />
               <Route path="/shipment-planner" element={<ShipmentPlanner />} />

@@ -25,3 +25,8 @@ certifi             # CA bundle for the Open-Meteo TLS handshake. Pinned explici
                     # fall back to the shipped snapshot on any host whose system trust store
                     # Python cannot read, and the platform would quietly stop being live
                     # without anything failing.
+
+# --- IR Engine (Pan-India Multi-Hazard Logistics Intelligence Search) ---
+sentence-transformers==3.0.1  # dense retrieval embeddings (all-MiniLM-L6-v2)
+numpy                         # vector arithmetic for dense retrieval
+# openai                      # optional: LLM grounding (set OPENAI_API_KEY to enable)

@@ -3,6 +3,7 @@ from flask_cors import CORS
 from src.api.auth_routes import auth_bp
 from src.api.ner_routes import ner_bp
 from src.api.shipment_routes import shipment_bp
+from src.api.ir_routes import ir_bp
 from src.db.session import init_db
 import logging
 import os
@@ -32,6 +33,7 @@ CORS(app, resources={r"/api/*": {"origins": _cors_origins.split(",") if _cors_or
 app.register_blueprint(auth_bp)
 app.register_blueprint(ner_bp)
 app.register_blueprint(shipment_bp)
+app.register_blueprint(ir_bp)
 
 # Create incident/shipment tables if absent. Non-fatal: the cross-border optimiser and the
 # read-only accessibility endpoints must keep working even if the database is unreachable.
@@ -105,6 +107,31 @@ def _warm_caches():
         logger.info("Warmed prediction model and network assessment in %.2fs", time.time() - started)
     except Exception as e:  # pragma: no cover - depends on deployment environment
         logger.warning(f"Cache warm-up skipped: {e}")
+
+    # Build the IR engine after the routing cache is ready so it can ingest live incidents.
+    try:
+        from src.ir.engine import ir_engine
+        from src.db.session import get_session
+        from src.db.models import Incident
+
+        session = get_session()
+        try:
+            incidents = [i.to_dict() for i in session.query(Incident).filter(
+                Incident.status == "verified"
+            ).limit(500).all()]
+        except Exception:
+            incidents = []
+        finally:
+            session.close()
+
+        started = time.time()
+        ir_engine.build(live_incidents=incidents)
+        logger.info(
+            "IR engine built in %.2fs — %d documents indexed (%d live incidents)",
+            time.time() - started, ir_engine.document_count, len(incidents),
+        )
+    except Exception as e:  # pragma: no cover
+        logger.warning(f"IR engine warm-up skipped: {e}")
 
 
 def _warmup_wanted() -> bool:

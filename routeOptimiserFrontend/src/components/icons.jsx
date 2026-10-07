@@ -56,3 +56,7 @@ export const IconLayers = (p) => (
 export const IconChevron = (p) => (
   <svg {...base} {...p}><path d="m9 5 7 7-7 7" /></svg>
 );
+
+export const IconSearch = (p) => (
+  <svg {...base} {...p}><circle cx="11" cy="11" r="7" /><path d="m16.5 16.5 4 4" /></svg>
+);
