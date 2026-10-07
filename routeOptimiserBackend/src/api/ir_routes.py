@@ -97,10 +97,14 @@ def rag_query():
 
     top_k      = min(int(body.get("top_k", 10)), 50)
     cargo_type = body.get("cargo_type")
+    method     = body.get("method", "hybrid")
+
+    if method not in ("hybrid", "bm25", "tfidf", "dense"):
+        method = "hybrid"
 
     try:
-        # 1. Retrieve evidence
-        bundle = ir_engine.search(query, top_k=top_k, method="hybrid", cargo_type=cargo_type)
+        # 1. Retrieve evidence using the requested method
+        bundle = ir_engine.search(query, top_k=top_k, method=method, cargo_type=cargo_type)
 
         # 2. Generate grounded answer
         rag_result = generate_answer(bundle)
@@ -112,7 +116,7 @@ def rag_query():
             "status":            "success",
             "query":             query,
             "parsed_query":      bundle.parsed,
-            "retrieval_method":  "hybrid",
+            "retrieval_method":  method,
             "latency_ms":        round(bundle.latency_ms, 1),
             "evidence":          bundle.to_dict()["results"],
             "answer":            rag_result["answer"],

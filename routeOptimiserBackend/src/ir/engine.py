@@ -109,16 +109,32 @@ class IREngine:
         if method == "hybrid":
             return self._hybrid.retrieve(pq, top_k=top_k, cargo_type=cargo_type or pq.cargo)
 
-        # Single-method fallback
+        # Single-method: populate ONLY the score field that corresponds to the method.
+        # All other scores stay 0.0 so the "Why ranked?" panel is honest about what
+        # was actually used — no phantom BM25/TF-IDF scores when Dense-only was selected.
         raw_results = self._hybrid.retrieve_by_method(pq, method, top_k=top_k)
         from src.ir.schemas import RetrievedResult
+        from src.ir.ranking.freshness import freshness_score
+        from src.ir.ranking.authority import authority_score
+        from src.ir.ranking.geographic import geographic_score
+
         results = []
         for rank, (doc_id, score) in enumerate(raw_results, start=1):
             doc = self._index.get_document(doc_id)
-            if doc:
-                results.append(RetrievedResult(
-                    document=doc, rank=rank, final_score=round(score, 4)
-                ))
+            if not doc:
+                continue
+            kwargs = dict(document=doc, rank=rank, final_score=round(score, 4))
+            if method == "bm25":
+                kwargs["bm25"] = round(score, 4)
+            elif method == "tfidf":
+                kwargs["tfidf"] = round(score, 4)
+            elif method == "dense":
+                kwargs["semantic"] = round(score, 4)
+            # Always compute the signal scores so the panel is informative
+            kwargs["freshness"]  = round(freshness_score(doc.date), 4)
+            kwargs["authority"]  = round(authority_score(doc.source_type), 4)
+            kwargs["geographic"] = round(geographic_score(doc, pq), 4)
+            results.append(RetrievedResult(**kwargs))
         return EvidenceBundle(
             query=query,
             parsed=pq.to_dict(),

@@ -86,24 +86,66 @@ function SectionHeading({ children }) {
 
 // ─── Why-ranked modal ─────────────────────────────────────────────────────────
 
-function WhyPanel({ result, onClose }) {
-  const doc = result;
+// Which score fields are meaningful for each retrieval method
+const METHOD_ACTIVE_SCORES = {
+  hybrid:  ["bm25", "tfidf", "semantic", "freshness", "geographic", "authority"],
+  bm25:    ["bm25",  "freshness", "geographic", "authority"],
+  tfidf:   ["tfidf", "freshness", "geographic", "authority"],
+  dense:   ["semantic", "freshness", "geographic", "authority"],
+};
+
+const SCORE_LABELS = {
+  bm25:      "BM25 relevance",
+  tfidf:     "TF-IDF relevance",
+  semantic:  "Semantic similarity",
+  freshness: "Freshness",
+  geographic:"Geographic",
+  authority: "Source authority",
+};
+
+function WhyPanel({ result, onClose, method = "hybrid" }) {
+  const doc    = result;
   const scores = result.scores || {};
+  const active = METHOD_ACTIVE_SCORES[method] || METHOD_ACTIVE_SCORES.hybrid;
+
+  const methodLabel = {
+    hybrid: "Hybrid (BM25 + Semantic + Freshness + Authority)",
+    bm25:   "BM25 only",
+    tfidf:  "TF-IDF only",
+    dense:  "Dense / Semantic only",
+  }[method] || method;
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
       <div className="bg-surface border border-white/20 rounded-xl p-6 max-w-lg w-full shadow-2xl">
-        <div className="flex justify-between items-start mb-4">
+        <div className="flex justify-between items-start mb-1">
           <h3 className="font-semibold text-ink">Why ranked #{result.rank}?</h3>
           <button onClick={onClose} className="text-ink-secondary hover:text-ink text-xl leading-none">✕</button>
         </div>
+        <p className="text-xs text-ink-secondary mb-4">
+          Method: <span className="text-accent">{methodLabel}</span>
+          {" — "}only active signals (bright bars) contributed to the final score.
+        </p>
 
         <div className="space-y-2 mb-5">
-          <ScoreBar label="BM25 relevance"      value={scores.bm25 ?? 0} />
-          <ScoreBar label="TF-IDF"              value={scores.tfidf ?? 0} />
-          <ScoreBar label="Semantic similarity" value={scores.semantic ?? 0} />
-          <ScoreBar label="Freshness"           value={scores.freshness ?? 0} />
-          <ScoreBar label="Geographic"          value={scores.geographic ?? 0} />
-          <ScoreBar label="Source authority"    value={scores.authority ?? 0} />
+          {Object.entries(SCORE_LABELS).map(([key, label]) => {
+            const value    = scores[key] ?? 0;
+            const isActive = active.includes(key);
+            return (
+              <div key={key} className={`flex items-center gap-2 text-xs ${isActive ? "" : "opacity-30"}`}>
+                <span className="w-28 text-ink-secondary text-right shrink-0">{label}</span>
+                <div className="flex-1 bg-white/10 rounded-full h-1.5">
+                  <div
+                    className={`h-1.5 rounded-full ${isActive ? "bg-accent" : "bg-white/30"}`}
+                    style={{ width: `${Math.round(Math.min(value, 1) * 100)}%` }}
+                  />
+                </div>
+                <span className={`w-10 text-right font-mono ${isActive ? "text-ink" : "text-ink-secondary"}`}>
+                  {isActive ? value.toFixed(3) : "—"}
+                </span>
+              </div>
+            );
+          })}
           <div className="border-t border-white/10 pt-2">
             <ScoreBar label="Final score" value={result.final_score ?? 0} />
           </div>
@@ -655,7 +697,7 @@ export default function IntelligenceSearch() {
       const res = await fetch(`${API_BASE_URL}/api/rag/query`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: q, top_k: topK, cargo_type: cargo || undefined }),
+        body: JSON.stringify({ query: q, top_k: topK, cargo_type: cargo || undefined, method }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || `Error ${res.status}`);
@@ -803,7 +845,7 @@ export default function IntelligenceSearch() {
       )}
 
       {/* Why modal */}
-      {whyDoc && <WhyPanel result={whyDoc} onClose={() => setWhyDoc(null)} />}
+      {whyDoc && <WhyPanel result={whyDoc} onClose={() => setWhyDoc(null)} method={result?.retrieval_method || "hybrid"} />}
     </div>
   );
 }
