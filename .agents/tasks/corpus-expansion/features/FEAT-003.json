@@ -2,7 +2,7 @@
   "id": "FEAT-003",
   "type": "chore",
   "description": "Remove provenance filter UI from the frontend Corpus Browser (IntelligenceSearch.jsx) and remove the provenance query parameter handling from the backend /api/ir/corpus endpoint (ir_routes.py). Keep provenance badges in search result cards (EvidenceCard and WhyPanel) unchanged — only remove them from the Corpus Browser. This feature is independent of FEAT-001 and FEAT-002.",
-  "status": "pending",
+  "status": "completed",
   "steps": [
     "1. Frontend changes in routeOptimiserFrontend/src/pages/IntelligenceSearch.jsx, CorpusBrowser component: (a) Remove the provF state variable and setProvF setter (line ~570), (b) Remove the PROVS constant array (line ~576), (c) Remove the provenance <select> dropdown from the filter row (line ~583), (d) Remove params.set('provenance', provF) from the fetch call (line ~581), (e) Remove the provenance <Badge> from the collapsed document row header (line ~605, inside the button), (f) Keep the provenance <Badge> in the expanded document details section (line ~620, this shows document metadata and should remain).",
     "2. Frontend: Do NOT remove provenance badges from EvidenceCard component (used for search results) or WhyPanel component (the 'Why ranked #N?' modal) — these components display search results, not the corpus browser, and their provenance badges should remain.",
@@ -29,5 +29,5 @@
     "Manual check: start backend with python main.py, open Corpus Browser in frontend, confirm no provenance dropdown in filter row, confirm provenance badge still visible in expanded document details"
   ],
   "blocked_reason": null,
-  "findings": ""
+  "findings": "Successfully removed provenance filter UI from Corpus Browser in IntelligenceSearch.jsx (removed provF state, PROVS constant, dropdown, and badge from collapsed row). Added provenance badge to expanded document details metadata section. Removed provenance query parameter handling from backend /api/ir/corpus endpoint in ir_routes.py. Provenance badges remain intact in EvidenceCard, WhyPanel, and PhraseSearchPanel as specified. Frontend build succeeded. Backend tests showed 176 passed; 1 pre-existing failure in test_real_data_providers.py unrelated to this change (traffic_service mock issue). All acceptance criteria met."
 }
