@@ -539,7 +539,6 @@ function CorpusBrowser() {
   const [error, setError]       = useState(null);
   const [hazardF, setHazardF]   = useState("");
   const [stateF, setStateF]     = useState("");
-  const [provF, setProvF]       = useState("");
   const [expanded, setExpanded] = useState(null);
 
   const load = async () => {
@@ -548,7 +547,6 @@ function CorpusBrowser() {
       const params = new URLSearchParams();
       if (hazardF) params.set("hazard", hazardF);
       if (stateF)  params.set("state", stateF);
-      if (provF)   params.set("provenance", provF);
       const res  = await fetch(`${API_BASE_URL}/api/ir/corpus?${params}`);
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || `Error ${res.status}`);
@@ -558,7 +556,6 @@ function CorpusBrowser() {
   };
 
   const HAZARDS = ["", "flood", "landslide", "cyclone", "rainfall", "heat", "accident", "infra", "road_block"];
-  const PROVS   = ["", "SYNTHETIC", "SAMPLED", "LIVE"];
 
   return (
     <div>
@@ -572,10 +569,6 @@ function CorpusBrowser() {
           placeholder="State filter…"
           className="bg-surface border border-white/20 rounded px-3 py-1.5 text-ink text-xs w-36 focus:outline-none focus:border-accent"
           aria-label="Filter by state" />
-        <select value={provF} onChange={e => setProvF(e.target.value)}
-          className="bg-surface border border-white/20 rounded px-3 py-1.5 text-ink text-xs">
-          {PROVS.map(p => <option key={p} value={p}>{p || "All provenance"}</option>)}
-        </select>
         <button onClick={load} disabled={loading}
           className="px-4 py-1.5 bg-accent rounded text-xs font-semibold hover:brightness-110 disabled:opacity-50 transition-all"
           style={{ color: "var(--bg-contrast)" }}>
@@ -605,9 +598,6 @@ function CorpusBrowser() {
                     <Badge className={SEV_BADGE[(doc.severity||"").toLowerCase()] ?? "bg-gray-700 text-gray-300"}>
                       {doc.severity}
                     </Badge>
-                    <Badge className={PROV_BADGE[doc.provenance] ?? "bg-gray-700 text-gray-300"}>
-                      {doc.provenance}
-                    </Badge>
                     <span className="text-ink-secondary text-xs">{expanded === doc.id ? "▲" : "▼"}</span>
                   </div>
                 </button>
@@ -623,6 +613,14 @@ function CorpusBrowser() {
                       {doc.state    && <p><span className="text-ink">State:</span> {doc.state}</p>}
                       {doc.highway  && <p><span className="text-ink">Highway:</span> <span className="font-mono">{doc.highway}</span></p>}
                       {doc.latitude && <p><span className="text-ink">Coords:</span> {doc.latitude.toFixed(4)}, {doc.longitude.toFixed(4)}</p>}
+                      {doc.provenance && (
+                        <p>
+                          <span className="text-ink">Provenance:</span>{" "}
+                          <Badge className={PROV_BADGE[doc.provenance] ?? "bg-gray-700 text-gray-300"}>
+                            {doc.provenance}
+                          </Badge>
+                        </p>
+                      )}
                     </div>
                     {doc.tags?.length > 0 && (
                       <div className="flex flex-wrap gap-1 pt-1">

@@ -1,0 +1,7 @@
+{
+  "task_id": "corpus-expansion",
+  "task_description": "Expand the IR corpus from 24 to 1000 documents with a deterministic generator, remove provenance filter UI from frontend, and remove provenance query parameter from backend API",
+  "status": "pending",
+  "feature_order": ["FEAT-001", "FEAT-002", "FEAT-003"],
+  "blocked_reason": null
+}

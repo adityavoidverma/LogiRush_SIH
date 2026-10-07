@@ -340,7 +340,6 @@ def corpus_browser():
 
     ?hazard=flood
     ?state=Assam
-    ?provenance=SYNTHETIC
     ?severity=high
     """
     ir_engine._ensure_built()
@@ -348,15 +347,12 @@ def corpus_browser():
 
     hazard     = (request.args.get("hazard")     or "").lower()
     state      = (request.args.get("state")      or "").lower()
-    provenance = (request.args.get("provenance") or "").upper()
     severity   = (request.args.get("severity")   or "").lower()
 
     if hazard:
         docs = [d for d in docs if d.hazard.lower() == hazard]
     if state:
         docs = [d for d in docs if state in (d.state or "").lower()]
-    if provenance:
-        docs = [d for d in docs if d.provenance == provenance]
     if severity:
         docs = [d for d in docs if d.severity.lower() == severity]
 

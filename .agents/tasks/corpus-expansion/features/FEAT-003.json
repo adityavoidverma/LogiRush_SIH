@@ -1,0 +1,33 @@
+{
+  "id": "FEAT-003",
+  "type": "chore",
+  "description": "Remove provenance filter UI from the frontend Corpus Browser (IntelligenceSearch.jsx) and remove the provenance query parameter handling from the backend /api/ir/corpus endpoint (ir_routes.py). Keep provenance badges in search result cards (EvidenceCard and WhyPanel) unchanged — only remove them from the Corpus Browser. This feature is independent of FEAT-001 and FEAT-002.",
+  "status": "pending",
+  "steps": [
+    "1. Frontend changes in routeOptimiserFrontend/src/pages/IntelligenceSearch.jsx, CorpusBrowser component: (a) Remove the provF state variable and setProvF setter (line ~570), (b) Remove the PROVS constant array (line ~576), (c) Remove the provenance <select> dropdown from the filter row (line ~583), (d) Remove params.set('provenance', provF) from the fetch call (line ~581), (e) Remove the provenance <Badge> from the collapsed document row header (line ~605, inside the button), (f) Keep the provenance <Badge> in the expanded document details section (line ~620, this shows document metadata and should remain).",
+    "2. Frontend: Do NOT remove provenance badges from EvidenceCard component (used for search results) or WhyPanel component (the 'Why ranked #N?' modal) — these components display search results, not the corpus browser, and their provenance badges should remain.",
+    "3. Frontend: Do NOT remove the PROV_BADGE constant (it is still used by EvidenceCard and WhyPanel).",
+    "4. Backend changes in routeOptimiserBackend/src/api/ir_routes.py, corpus_browser() function: (a) Remove the line provenance = (request.args.get('provenance') or '').upper() (line ~216), (b) Remove the conditional filter block if provenance: docs = [d for d in docs if d.provenance == provenance] (line ~220), (c) Keep hazard, state, and severity filters unchanged.",
+    "5. Verify the frontend still compiles and the Corpus Browser filter row shows only hazard (dropdown), state (text input), and severity (if it exists) — no provenance dropdown.",
+    "6. Verify the backend /api/ir/corpus endpoint still accepts ?hazard=flood&state=Assam&severity=high but ignores ?provenance=LIVE if passed (no error, just no filtering)."
+  ],
+  "acceptance_criteria": [
+    "Frontend Corpus Browser filter row has no provenance dropdown selector",
+    "Frontend Corpus Browser collapsed document rows (the clickable header) have no provenance badge",
+    "Frontend Corpus Browser expanded document details still show provenance badge (in the metadata section with other document fields)",
+    "Frontend EvidenceCard component (search results) still shows provenance badges — unchanged",
+    "Frontend WhyPanel component ('Why ranked #N?' modal) still shows provenance badges — unchanged",
+    "Backend /api/ir/corpus endpoint no longer filters by provenance query parameter",
+    "GET /api/ir/corpus?hazard=flood returns flood documents without error",
+    "GET /api/ir/corpus?provenance=LIVE does not filter (returns all documents, ignores the parameter)",
+    "npm run build succeeds for the frontend",
+    "python -m pytest passes for the backend"
+  ],
+  "verification": [
+    "cd routeOptimiserFrontend && npm run build (ensure no build errors)",
+    "cd routeOptimiserBackend && python -m pytest -xvs (all tests pass)",
+    "Manual check: start backend with python main.py, open Corpus Browser in frontend, confirm no provenance dropdown in filter row, confirm provenance badge still visible in expanded document details"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

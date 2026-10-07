@@ -1,0 +1,22 @@
+{
+  "project_type": "Flask REST API backend + React (Vite) frontend",
+  "language": "Python 3.11+ backend, JavaScript (React 18) frontend",
+  "build_system": "pip for backend, npm + Vite for frontend",
+  "test_framework": "pytest for backend (165 tests), no frontend test framework found",
+  "build_command": "Backend: python -m pytest (runs tests); Frontend: npm run build (production build check)",
+  "test_command": "pytest from routeOptimiserBackend/",
+  "verification_instructions": "Backend: cd routeOptimiserBackend && python -m pytest. Frontend: cd routeOptimiserFrontend && npm run build. For corpus: start backend with python main.py, query corpus endpoint and verify 1000 docs.",
+  "snapshot_or_generated_files": "None that need to be checked in for this task",
+  "environment_constraints": "Backend runs on port 5001 by default. IR engine builds index at startup from corpus.build_corpus(). Frontend must have VITE_API_BASE_URL set to backend URL.",
+  "contribution_requirements": "Run pytest before submitting. README.md instructs: 'Please run python -m pytest and npm run build before submitting.'",
+  "key_patterns": "Backend: Flask blueprints in src/api/, data classes with dataclass decorator in src/ir/schemas.py, corpus functions return list[IRDocument]. Frontend: Tailwind CSS classes, useState hooks, API_BASE_URL constant from src/api/client.js, Badge component reused across views.",
+  "relevant_files": [
+    "routeOptimiserBackend/src/ir/corpus.py",
+    "routeOptimiserBackend/src/ir/schemas.py",
+    "routeOptimiserBackend/src/api/ir_routes.py",
+    "routeOptimiserFrontend/src/pages/IntelligenceSearch.jsx",
+    "routeOptimiserBackend/requirements.txt",
+    "README.md"
+  ],
+  "directory_structure": "LogiRush/routeOptimiserBackend/src/{api,ir,data_processing,db,modeling,optimization,services}; LogiRush/routeOptimiserFrontend/src/{components,pages,api}"
+}
