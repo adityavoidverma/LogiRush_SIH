@@ -14,6 +14,7 @@ collection covers major corridors across all Indian states and hazard types.
 from __future__ import annotations
 
 from src.ir.schemas import IRDocument
+from src.ir.corpus_generator import generate_corpus
 
 # ─────────────────────────────────────────────────────────────────────
 # SEED CORPUS
@@ -507,15 +508,23 @@ def build_corpus(live_incidents: list[dict] | None = None) -> list[IRDocument]:
     """
     Build the full retrieval corpus.
 
+    Corpus composition: 24 hand-curated SEED_DOCUMENTS + 1000 generated documents + live incidents
+
     Merges:
       1. The static seed documents (SYNTHETIC / SAMPLED).
-      2. Live incidents from the database (LIVE provenance).
+      2. Generated synthetic documents from corpus_generator (SYNTHETIC provenance).
+      3. Live incidents from the database (LIVE provenance).
 
     Parameters
     ----------
     live_incidents : list of incident dicts from the database (optional)
     """
-    docs = get_seed_documents()
+    # Start with the original 24 seed documents
+    docs = list(SEED_DOCUMENTS)
+    
+    # Add 1000 generated documents
+    generated = generate_corpus(count=1000, seed=42)
+    docs.extend(generated)
 
     if live_incidents:
         for inc in live_incidents:
