@@ -1,0 +1,21 @@
+{
+  "verdict": "APPROVED",
+  "iteration": 1,
+  "findings": [],
+  "evidence_checked": [
+    "corpus_generator.py generates exactly 1000 documents",
+    "build_corpus() returns 1023 documents (23 seed + 1000 generated)",
+    "Deterministic generation verified (seed=42)",
+    "Hazard distribution: 300 floods, 250 landslides, 150 rainfall, 100 cyclones, 100 accidents, 80 infra, 20 heat",
+    "Severity distribution: 200 low, 400 medium, 300 high, 100 critical",
+    "All generated documents have provenance=SYNTHETIC",
+    "Frontend CorpusBrowser has no provenance dropdown in filter row",
+    "Frontend provenance badges remain in EvidenceCard, WhyPanel, PhraseSearchPanel",
+    "Frontend provenance badge added to expanded document details in CorpusBrowser",
+    "Backend /api/ir/corpus ignores provenance query parameter",
+    "Backend tests: 206 passed, 0 failures",
+    "Frontend build: npm run build succeeded"
+  ],
+  "summary": "Corpus expansion to 1023 documents (23 seed + 1000 synthetic) successfully implemented with deterministic generation, correct hazard/severity distributions, and provenance filter removed from Corpus Browser UI. All acceptance criteria met, tests pass, builds succeed.",
+  "reviewDoc": "/Users/user/Downloads/LogiRush/.agents/tasks/corpus-expansion/2026-01-07-121500-review.md"
+}
