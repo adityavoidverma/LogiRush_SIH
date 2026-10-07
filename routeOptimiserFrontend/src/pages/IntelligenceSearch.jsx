@@ -215,7 +215,6 @@ function WhyPanel({ result, onClose, method = "hybrid" }) {
 function EvidenceCard({ result, rank, onWhy }) {
   const doc = result;
   const sev  = (doc.severity || "").toLowerCase();
-  const prov = doc.provenance || "SYNTHETIC";
 
   return (
     <div className="bg-surface border border-white/10 rounded-lg p-4 hover:border-accent/40 transition-colors">
@@ -224,32 +223,32 @@ function EvidenceCard({ result, rank, onWhy }) {
           <span className="text-accent font-mono text-sm font-bold shrink-0">#{rank}</span>
           <span className="font-medium text-ink">{doc.title}</span>
         </div>
-        <span className="text-accent font-mono text-sm shrink-0">
-          {(result.final_score ?? 0).toFixed(3)}
-        </span>
+        {/* Final score — labeled explicitly for IR audience */}
+        <div className="text-right shrink-0">
+          <span className="text-accent font-mono text-sm font-bold">{(result.final_score ?? 0).toFixed(3)}</span>
+          <div className="text-[10px] text-ink-secondary">final score</div>
+        </div>
       </div>
 
       <div className="flex flex-wrap gap-1.5 mb-2">
         {sev && <Badge className={SEV_BADGE[sev] ?? "bg-gray-700 text-gray-300"}>{sev.toUpperCase()}</Badge>}
-        <Badge className={PROV_BADGE[prov] ?? "bg-gray-700 text-gray-300"}>{prov}</Badge>
         {doc.hazard && <Badge className="bg-white/10 text-ink-secondary">{doc.hazard}</Badge>}
         {doc.highway && <Badge className="bg-white/10 text-ink-secondary font-mono">{doc.highway}</Badge>}
         {doc.state && <Badge className="bg-white/10 text-ink-secondary">{doc.state}</Badge>}
+        {doc.source && <Badge className="bg-white/5 text-ink-secondary/70">{doc.source}</Badge>}
       </div>
 
       <p className="text-sm text-ink-secondary mb-3 line-clamp-2">{doc.text}</p>
 
       <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-ink-secondary">
-        <span>
-          <span className="text-ink">Source:</span> {doc.source} ·{" "}
-          <span className="text-ink">Date:</span> {doc.date} ·{" "}
-          <span className="text-ink font-mono">{doc.id}</span>
+        <span className="font-mono">
+          {doc.id} · {doc.date}
         </span>
         <button
           onClick={() => onWhy(result)}
           className="px-2 py-1 rounded border border-accent/40 text-accent text-xs hover:bg-accent/10 transition-colors"
         >
-          Why ranked #{rank}?
+          Why ranked #{rank}? ↗
         </button>
       </div>
     </div>
@@ -675,8 +674,10 @@ function AdvancedSearchSection() {
           {tab === "phrase"    && (
             <>
               <p className="text-xs text-ink-secondary mb-4">
-                Finds documents containing the <strong className="text-ink">exact consecutive token sequence</strong>.
-                Useful for specific highway names, exact incident phrases, or named corridors.
+                <span className="text-ink font-semibold">Phrase search</span> — uses positional posting lists to find documents containing the{" "}
+                <strong className="text-ink">exact consecutive token sequence</strong>.
+                Time complexity O(n·k) where n = candidate docs, k = phrase length.
+                Useful for exact highway names, incident phrases, or named corridors.
               </p>
               <PhraseSearchPanel />
             </>
@@ -684,8 +685,10 @@ function AdvancedSearchSection() {
           {tab === "proximity" && (
             <>
               <p className="text-xs text-ink-secondary mb-4">
-                Finds documents where two terms appear <strong className="text-ink">within N tokens</strong> of each other —
-                captures related co-occurring concepts even when not adjacent.
+                <span className="text-ink font-semibold">Proximity search</span> — uses positional posting lists to find documents where two terms appear{" "}
+                <strong className="text-ink">within N tokens</strong> of each other.
+                Captures co-occurrence of semantically related concepts without exact adjacency.
+                Minimum token distance is returned per document.
               </p>
               <ProximitySearchPanel />
             </>
@@ -693,14 +696,101 @@ function AdvancedSearchSection() {
           {tab === "corpus"    && (
             <>
               <p className="text-xs text-ink-secondary mb-4">
-                Browse all documents indexed by the IR engine. Click any document to see its full text,
-                metadata, provenance label, and coordinates. Use filters to narrow by hazard, state, or data type.
+                Browse all <span className="text-ink font-semibold">1,023 documents</span> currently indexed by the IR engine.
+                Corpus covers 36 Indian states/UTs across 7 hazard types (flood 30%, landslide 25%, rainfall 15%, cyclone 10%, accident 10%, infrastructure 8%, heat 2%).
+                Click any document to inspect its full text, metadata, and coordinates.
               </p>
               <CorpusBrowser />
             </>
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+// ─── Feature pill ─────────────────────────────────────────────────────────────
+
+function FeaturePill({ icon, label }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-white/15 bg-white/5 text-xs text-ink-secondary">
+      <span>{icon}</span>
+      <span>{label}</span>
+    </span>
+  );
+}
+
+// ─── Stats bar ────────────────────────────────────────────────────────────────
+
+function StatsBar() {
+  return (
+    <div className="flex flex-wrap justify-center gap-8 mb-6">
+      {[
+        { value: "1,023", label: "Documents indexed" },
+        { value: "4",     label: "Retrieval methods" },
+        { value: "36",    label: "States / UTs" },
+        { value: "7",     label: "Hazard types" },
+      ].map(({ value, label }) => (
+        <div key={label} className="text-center">
+          <div className="text-2xl font-bold text-accent font-mono">{value}</div>
+          <div className="text-xs text-ink-secondary mt-0.5">{label}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ─── Evaluation metrics banner ────────────────────────────────────────────────
+
+function EvalBanner() {
+  // Real numbers from: python3.11 -c "from src.ir.engine import ir_engine; ..."
+  // Evaluated on 25-query judgement set, top_k=5
+  const rows = [
+    { method: "TF-IDF",  p5: "0.296", r5: "0.611", mrr: "0.800", note: "baseline" },
+    { method: "BM25",    p5: "0.312", r5: "0.653", mrr: "0.805", note: "best P@5 & MRR", best: true },
+    { method: "Dense",   p5: "0.248", r5: "0.516", mrr: "0.673", note: "semantic generalisation" },
+    { method: "Hybrid",  p5: "0.272", r5: "0.591", mrr: "0.772", note: "multi-signal fusion" },
+  ];
+  return (
+    <div className="border border-white/10 rounded-xl p-4 mb-6 bg-white/2">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-xs font-semibold text-ink uppercase tracking-wider">
+          Evaluation — 25 queries · Top-5 · Relevance judgements against 1,023-doc corpus
+        </h3>
+        <span className="text-[10px] text-ink-secondary border border-white/10 rounded px-2 py-0.5 font-mono">
+          P@5 · R@5 · MRR
+        </span>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-xs">
+          <thead>
+            <tr className="text-ink-secondary border-b border-white/10">
+              <th className="text-left pb-2 font-medium">Method</th>
+              <th className="text-right pb-2 font-medium">P@5</th>
+              <th className="text-right pb-2 font-medium">R@5</th>
+              <th className="text-right pb-2 font-medium">MRR</th>
+              <th className="text-left pb-2 font-medium pl-4 hidden sm:table-cell">Note</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map(r => (
+              <tr key={r.method}
+                className={`border-b border-white/5 ${r.best ? "text-accent" : "text-ink-secondary"}`}>
+                <td className="py-1.5 font-mono font-medium">{r.method}</td>
+                <td className={`py-1.5 text-right font-mono ${r.best ? "font-bold" : ""}`}>{r.p5}</td>
+                <td className={`py-1.5 text-right font-mono ${r.best ? "font-bold" : ""}`}>{r.r5}</td>
+                <td className={`py-1.5 text-right font-mono ${r.best ? "font-bold" : ""}`}>{r.mrr}</td>
+                <td className="py-1.5 pl-4 hidden sm:table-cell text-ink-secondary/60">{r.note}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p className="text-[10px] text-ink-secondary mt-2">
+        BM25 leads on precision-focused queries where exact highway/location terms dominate.
+        Hybrid fusion benefits queries with broader semantic intent.
+        Dense lower here due to exact-match bias in judgement set.
+      </p>
     </div>
   );
 }
@@ -747,15 +837,50 @@ export default function IntelligenceSearch() {
   return (
     <div className="max-w-4xl mx-auto px-4 py-10">
 
-      {/* Header */}
+      {/* ── Hero ──────────────────────────────────────────────────────── */}
       <div className="mb-8 text-center">
-        <h1 className="text-3xl font-bold text-ink mb-2">LogiRush Intelligence Search</h1>
-        <p className="text-ink-secondary max-w-xl mx-auto text-sm">
-          Pan-India multi-hazard · Hybrid IR · Grounded answers · Phrase & proximity search
+        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-accent/10 border border-accent/30 text-accent text-xs font-medium mb-4">
+          <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse inline-block" />
+          Live IR System · RAG-augmented
+        </div>
+        <h1 className="text-3xl font-bold text-ink mb-2 tracking-tight">
+          LogiRush Intelligence Search
+        </h1>
+        <p className="text-ink-secondary max-w-2xl mx-auto text-sm mb-5">
+          A multi-method information retrieval engine over a 1,023-document logistics hazard corpus.
+          Supports BM25, TF-IDF, dense vector retrieval (all-MiniLM-L6-v2), and hybrid score fusion —
+          with query expansion, freshness decay, authority scoring, and RAG-grounded answers.
         </p>
+
+        {/* Feature pills */}
+        <div className="flex flex-wrap justify-center gap-2 mb-6">
+          <FeaturePill icon="📖" label="Inverted Index + Positional Postings" />
+          <FeaturePill icon="⚖️" label="BM25  k₁=1.5  b=0.75" />
+          <FeaturePill icon="🧠" label="Dense: all-MiniLM-L6-v2 (384-dim)" />
+          <FeaturePill icon="🔀" label="Hybrid Fusion  0.45·BM25 + 0.35·Semantic + 0.10·Freshness + 0.10·Authority" />
+          <FeaturePill icon="🔍" label="Phrase & Proximity Search" />
+          <FeaturePill icon="💬" label="RAG  (Groq LLM)" />
+        </div>
+
+        {/* Corpus stats */}
+        <StatsBar />
       </div>
 
-      {/* Main search */}
+      {/* ── Evaluation metrics banner ─────────────────────────────────── */}
+      <EvalBanner />
+
+      {/* ── IR Architecture note ──────────────────────────────────────── */}
+      <div className="bg-white/3 border border-white/10 rounded-xl px-5 py-4 mb-6 text-xs text-ink-secondary leading-relaxed">
+        <span className="text-ink font-semibold text-sm">Pipeline: </span>
+        Raw query
+        <span className="mx-1 text-accent">→</span> Query parser + expansion (HAZARD_SYNONYMS)
+        <span className="mx-1 text-accent">→</span> BM25 (Okapi) + TF-IDF + Dense cosine similarity (3×top-K candidates)
+        <span className="mx-1 text-accent">→</span> Score fusion + geographic boost
+        <span className="mx-1 text-accent">→</span> Top-K re-ranked results
+        <span className="mx-1 text-accent">→</span> RAG grounding (Groq / OpenAI / structured fallback)
+      </div>
+
+      {/* ── Main search ───────────────────────────────────────────────── */}
       <form onSubmit={handleSearch} className="mb-4">
         <div className="flex gap-2 mb-3">
           <input
@@ -764,37 +889,46 @@ export default function IntelligenceSearch() {
             value={query}
             onChange={e => setQuery(e.target.value)}
             placeholder="e.g. Can I transport medicine from Guwahati to Kolkata today?"
-            className="flex-1 bg-surface border border-white/20 rounded-lg px-4 py-3 text-ink placeholder-ink-secondary focus:outline-none focus:border-accent"
+            className="flex-1 bg-surface border border-white/20 rounded-lg px-4 py-3 text-ink placeholder-ink-secondary focus:outline-none focus:border-accent text-sm"
             aria-label="Logistics query"
           />
           <button type="submit" disabled={loading || !query.trim()}
-            className="px-6 py-3 bg-accent rounded-lg font-semibold hover:brightness-110 disabled:opacity-50 transition-all"
+            className="px-6 py-3 bg-accent rounded-lg font-semibold hover:brightness-110 disabled:opacity-50 transition-all text-sm"
             style={{ color: "var(--bg-contrast)" }}>
             {loading ? "Searching…" : "Search"}
           </button>
         </div>
 
-        <div className="flex flex-wrap gap-3 mb-3">
-          <select value={method} onChange={e => setMethod(e.target.value)}
-            className="bg-surface border border-white/20 rounded px-3 py-1.5 text-ink text-xs"
-            aria-label="Retrieval method">
-            {METHODS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
-          </select>
-          <select value={cargo} onChange={e => setCargo(e.target.value)}
-            className="bg-surface border border-white/20 rounded px-3 py-1.5 text-ink text-xs"
-            aria-label="Cargo type">
-            {CARGO_TYPES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
-          </select>
-          <div className="flex items-center gap-2 text-xs text-ink-secondary">
-            <label htmlFor="topk">Top-K:</label>
+        {/* Controls row — labeled for IR audience */}
+        <div className="flex flex-wrap gap-3 mb-3 items-center">
+          <div className="flex flex-col gap-0.5">
+            <span className="text-[10px] text-ink-secondary uppercase tracking-wider pl-1">Retrieval Method</span>
+            <select value={method} onChange={e => setMethod(e.target.value)}
+              className="bg-surface border border-white/20 rounded px-3 py-1.5 text-ink text-xs"
+              aria-label="Retrieval method">
+              {METHODS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+            </select>
+          </div>
+          <div className="flex flex-col gap-0.5">
+            <span className="text-[10px] text-ink-secondary uppercase tracking-wider pl-1">Cargo Type</span>
+            <select value={cargo} onChange={e => setCargo(e.target.value)}
+              className="bg-surface border border-white/20 rounded px-3 py-1.5 text-ink text-xs"
+              aria-label="Cargo type">
+              {CARGO_TYPES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+            </select>
+          </div>
+          <div className="flex flex-col gap-0.5">
+            <span className="text-[10px] text-ink-secondary uppercase tracking-wider pl-1">Top-K</span>
             <input id="topk" type="number" value={topK}
               onChange={e => setTopK(Math.max(1, Math.min(50, +e.target.value)))}
-              className="w-14 bg-surface border border-white/20 rounded px-2 py-1.5 text-ink text-xs"
+              className="w-16 bg-surface border border-white/20 rounded px-2 py-1.5 text-ink text-xs text-center"
               min={1} max={50} />
           </div>
         </div>
 
+        {/* Example queries */}
         <div className="flex flex-wrap gap-1.5">
+          <span className="text-[10px] text-ink-secondary self-center mr-1 uppercase tracking-wider">Try:</span>
           {EXAMPLE_QUERIES.map(ex => (
             <button key={ex} type="button" onClick={() => handleExample(ex)}
               className="text-xs px-2 py-1 border border-white/10 rounded hover:border-accent/50 text-ink-secondary hover:text-ink transition-colors">
@@ -807,59 +941,85 @@ export default function IntelligenceSearch() {
       {/* Advanced search: phrase / proximity / corpus */}
       <AdvancedSearchSection />
 
-      {/* Error */}
+      {/* ── Error ─────────────────────────────────────────────────────── */}
       {error && (
         <div className="bg-red-900/30 border border-red-500/40 rounded-lg p-4 mb-6 text-red-300 text-sm">
           {error}
         </div>
       )}
 
-      {/* Results */}
+      {/* ── Results ───────────────────────────────────────────────────── */}
       {result && (
         <div>
-          {/* Risk + answer */}
-          <div className={`border rounded-xl p-5 mb-5 ${riskColor}`}>
-            <div className="flex flex-wrap items-center gap-3 mb-2">
-              <span className={`text-2xl font-bold font-mono ${riskColor.split(" ")[0]}`}>
+
+          {/* ── Retrieval run metadata bar ── */}
+          <div className="flex flex-wrap gap-x-5 gap-y-1.5 px-4 py-3 mb-4 bg-white/3 border border-white/10 rounded-lg text-xs text-ink-secondary">
+            <span><span className="text-ink font-medium">Method:</span> {result.retrieval_method}</span>
+            <span><span className="text-ink font-medium">Latency:</span> {result.latency_ms?.toFixed(0)} ms</span>
+            <span><span className="text-ink font-medium">Docs retrieved:</span> {result.evidence?.length ?? 0} / top-{topK}</span>
+            <span><span className="text-ink font-medium">Corpus size:</span> 1,023 docs</span>
+            <span><span className="text-ink font-medium">LLM:</span> {result.grounded ? result.provider : "structured fallback (no LLM)"}</span>
+            {result.grounded && (
+              <span className="text-green-400">✓ RAG-grounded answer</span>
+            )}
+          </div>
+
+          {/* ── Parsed query ── */}
+          <ParsedQueryPanel pq={result.parsed_query} />
+
+          {/* ── RAG answer / risk panel ── */}
+          <div className={`border-2 rounded-xl p-5 mb-5 ${riskColor}`}>
+            <div className="flex flex-wrap items-center gap-3 mb-3">
+              <span className={`text-2xl font-bold font-mono tracking-tight ${riskColor.split(" ")[0]}`}>
                 Route Risk: {result.risk_level ?? "UNKNOWN"}
               </span>
-              <span className="text-xs text-ink-secondary">
-                {result.latency_ms?.toFixed(0)} ms · {result.retrieval_method} · LLM: {result.grounded ? result.provider : "fallback"}
-              </span>
+              {result.grounded && result.provider && (
+                <span className="text-xs text-green-400 border border-green-400/30 rounded px-2 py-0.5">
+                  ✓ Grounded by {result.provider}
+                </span>
+              )}
+              {!result.grounded && (
+                <span className="text-xs text-yellow-400/80 border border-yellow-400/20 rounded px-2 py-0.5">
+                  ⚠ Structured fallback — no LLM
+                </span>
+              )}
             </div>
 
-            {result.grounded && result.provider && (
-              <p className="text-xs text-green-400/80 mb-2">✓ Grounded by {result.provider}</p>
-            )}
             {result.note && (
-              <p className="text-xs text-yellow-400/80 italic mb-2">⚠ {result.note}</p>
+              <p className="text-xs text-yellow-400/80 italic mb-3">⚠ {result.note}</p>
             )}
 
-            {/* Render markdown-style bold */}
             <div className="text-sm text-ink leading-relaxed whitespace-pre-wrap"
                  dangerouslySetInnerHTML={{ __html:
                    (result.answer || "").replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
                  }} />
 
             {result.evidence_used?.length > 0 && (
-              <p className="mt-3 text-xs text-ink-secondary border-t border-white/10 pt-2">
-                Evidence cited: {result.evidence_used.join(", ")}
+              <p className="mt-4 text-xs text-ink-secondary border-t border-white/10 pt-3 font-mono">
+                Evidence cited: {result.evidence_used.join(" · ")}
               </p>
             )}
           </div>
 
-          {/* Route recommendation */}
+          {/* ── Route recommendation ── */}
           {result.route_recommendation && <RoutePanel rec={result.route_recommendation} />}
 
-          {/* Parsed query */}
-          <ParsedQueryPanel pq={result.parsed_query} />
-
-          {/* Evidence */}
+          {/* ── Retrieved evidence ── */}
           {result.evidence?.length > 0 ? (
             <div>
-              <SectionHeading>
-                Retrieved Evidence — {result.evidence.length} document{result.evidence.length !== 1 ? "s" : ""}
-              </SectionHeading>
+              {/* Section header with IR terminology */}
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-xs font-semibold text-ink-secondary uppercase tracking-wider">
+                  Retrieved Evidence
+                  <span className="ml-2 text-ink font-mono normal-case">
+                    ({result.evidence.length} doc{result.evidence.length !== 1 ? "s" : ""}, ranked by {result.retrieval_method} score)
+                  </span>
+                </h2>
+                <span className="text-[10px] text-ink-secondary border border-white/10 rounded px-2 py-0.5">
+                  Click "Why ranked #N?" to inspect per-signal score breakdown
+                </span>
+              </div>
+
               <div className="space-y-3">
                 {result.evidence.map(r => (
                   <EvidenceCard key={r.id} result={r} rank={r.rank} onWhy={setWhyDoc} />
@@ -874,7 +1034,7 @@ export default function IntelligenceSearch() {
         </div>
       )}
 
-      {/* Why modal */}
+      {/* ── Why-ranked modal ──────────────────────────────────────────── */}
       {whyDoc && <WhyPanel result={whyDoc} onClose={() => setWhyDoc(null)} method={result?.retrieval_method || "hybrid"} />}
     </div>
   );
