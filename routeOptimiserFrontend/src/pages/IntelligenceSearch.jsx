@@ -86,12 +86,20 @@ function SectionHeading({ children }) {
 
 // ─── Why-ranked modal ─────────────────────────────────────────────────────────
 
-// Which score fields are meaningful for each retrieval method
+// Which score fields actually DROVE the final score for each method
 const METHOD_ACTIVE_SCORES = {
   hybrid:  ["bm25", "tfidf", "semantic", "freshness", "geographic", "authority"],
-  bm25:    ["bm25",  "freshness", "geographic", "authority"],
-  tfidf:   ["tfidf", "freshness", "geographic", "authority"],
-  dense:   ["semantic", "freshness", "geographic", "authority"],
+  bm25:    ["bm25"],
+  tfidf:   ["tfidf"],
+  dense:   ["semantic"],
+};
+
+// Which are shown as informational (visible but greyed, did NOT affect final score)
+const METHOD_INFO_SCORES = {
+  hybrid:  [],
+  bm25:    ["freshness", "geographic", "authority"],
+  tfidf:   ["freshness", "geographic", "authority"],
+  dense:   ["freshness", "geographic", "authority"],
 };
 
 const SCORE_LABELS = {
@@ -107,6 +115,7 @@ function WhyPanel({ result, onClose, method = "hybrid" }) {
   const doc    = result;
   const scores = result.scores || {};
   const active = METHOD_ACTIVE_SCORES[method] || METHOD_ACTIVE_SCORES.hybrid;
+  const info   = (METHOD_INFO_SCORES[method]  || []);
 
   const methodLabel = {
     hybrid: "Hybrid (BM25 + Semantic + Freshness + Authority)",
@@ -124,31 +133,54 @@ function WhyPanel({ result, onClose, method = "hybrid" }) {
         </div>
         <p className="text-xs text-ink-secondary mb-4">
           Method: <span className="text-accent">{methodLabel}</span>
-          {" — "}only active signals (bright bars) contributed to the final score.
         </p>
 
-        <div className="space-y-2 mb-5">
+        <div className="space-y-2 mb-2">
           {Object.entries(SCORE_LABELS).map(([key, label]) => {
-            const value    = scores[key] ?? 0;
+            const value  = scores[key] ?? 0;
             const isActive = active.includes(key);
+            const isInfo   = info.includes(key);
+            // inactive = not active and not info
+            const isInactive = !isActive && !isInfo;
+
             return (
-              <div key={key} className={`flex items-center gap-2 text-xs ${isActive ? "" : "opacity-30"}`}>
+              <div key={key} className={`flex items-center gap-2 text-xs ${isInactive ? "opacity-20" : isInfo ? "opacity-50" : ""}`}>
                 <span className="w-28 text-ink-secondary text-right shrink-0">{label}</span>
                 <div className="flex-1 bg-white/10 rounded-full h-1.5">
                   <div
-                    className={`h-1.5 rounded-full ${isActive ? "bg-accent" : "bg-white/30"}`}
+                    className={`h-1.5 rounded-full ${isActive ? "bg-accent" : isInfo ? "bg-white/40" : "bg-white/20"}`}
                     style={{ width: `${Math.round(Math.min(value, 1) * 100)}%` }}
                   />
                 </div>
                 <span className={`w-10 text-right font-mono ${isActive ? "text-ink" : "text-ink-secondary"}`}>
-                  {isActive ? value.toFixed(3) : "—"}
+                  {isInactive ? "—" : value.toFixed(3)}
                 </span>
               </div>
             );
           })}
-          <div className="border-t border-white/10 pt-2">
-            <ScoreBar label="Final score" value={result.final_score ?? 0} />
-          </div>
+        </div>
+
+        {/* Legend */}
+        <div className="flex gap-4 text-xs text-ink-secondary mb-4">
+          <span className="flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-accent inline-block" />
+            drove final score
+          </span>
+          {info.length > 0 && (
+            <span className="flex items-center gap-1.5 opacity-50">
+              <span className="w-2 h-2 rounded-full bg-white/40 inline-block" />
+              info only (not used)
+            </span>
+          )}
+        </div>
+
+        <div className="border-t border-white/10 pt-3 mb-4">
+          <ScoreBar label="Final score" value={result.final_score ?? 0} />
+          {method !== "hybrid" && (
+            <p className="text-xs text-ink-secondary mt-1 pl-1">
+              = {SCORE_LABELS[active[0]]} score only
+            </p>
+          )}
         </div>
 
         <div className="text-xs text-ink-secondary space-y-1">

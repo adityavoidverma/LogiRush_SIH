@@ -109,9 +109,9 @@ class IREngine:
         if method == "hybrid":
             return self._hybrid.retrieve(pq, top_k=top_k, cargo_type=cargo_type or pq.cargo)
 
-        # Single-method: populate ONLY the score field that corresponds to the method.
-        # All other scores stay 0.0 so the "Why ranked?" panel is honest about what
-        # was actually used — no phantom BM25/TF-IDF scores when Dense-only was selected.
+        # Single-method: final_score = ONLY the method's retrieval score.
+        # Signal scores (freshness, authority, geographic) are shown for information
+        # in the "Why ranked?" panel but do NOT contribute to the final score.
         raw_results = self._hybrid.retrieve_by_method(pq, method, top_k=top_k)
         from src.ir.schemas import RetrievedResult
         from src.ir.ranking.freshness import freshness_score
@@ -123,18 +123,35 @@ class IREngine:
             doc = self._index.get_document(doc_id)
             if not doc:
                 continue
-            kwargs = dict(document=doc, rank=rank, final_score=round(score, 4))
+
+            # Final score = the chosen method's score only
+            final = round(score, 4)
+
+            # Set the method's own score field; others stay 0.0
+            bm25_s = tfidf_s = sem_s = 0.0
             if method == "bm25":
-                kwargs["bm25"] = round(score, 4)
+                bm25_s = final
             elif method == "tfidf":
-                kwargs["tfidf"] = round(score, 4)
+                tfidf_s = final
             elif method == "dense":
-                kwargs["semantic"] = round(score, 4)
-            # Always compute the signal scores so the panel is informative
-            kwargs["freshness"]  = round(freshness_score(doc.date), 4)
-            kwargs["authority"]  = round(authority_score(doc.source_type), 4)
-            kwargs["geographic"] = round(geographic_score(doc, pq), 4)
-            results.append(RetrievedResult(**kwargs))
+                sem_s = final
+
+            # Informational signals — shown in panel but marked inactive
+            fresh = round(freshness_score(doc.date), 4)
+            auth  = round(authority_score(doc.source_type), 4)
+            geo   = round(geographic_score(doc, pq), 4)
+
+            results.append(RetrievedResult(
+                document=doc,
+                rank=rank,
+                bm25=bm25_s,
+                tfidf=tfidf_s,
+                semantic=sem_s,
+                freshness=fresh,
+                authority=auth,
+                geographic=geo,
+                final_score=final,      # ← pure single-method score
+            ))
         return EvidenceBundle(
             query=query,
             parsed=pq.to_dict(),
