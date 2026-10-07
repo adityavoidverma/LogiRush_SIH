@@ -25,30 +25,38 @@ logger = logging.getLogger("ir.rag")
 
 _PROMPT_TEMPLATE = """\
 You are LogiRush, a logistics risk advisor for India.
-Answer the question below using ONLY the evidence provided.
-Do not invent road closures, weather conditions, incidents, or statistics.
-If the evidence is insufficient for a confident answer, say so explicitly.
-Cite evidence by document ID (e.g. [DOC_F001]).
+
+STRICT RULES — follow exactly:
+1. Answer ONLY from the evidence documents listed below. Do not infer, extrapolate, or guess.
+2. If no document directly mentions the specific highway, location, or route asked about, say:
+   "No direct evidence found for [specific query]. I cannot assess risk for this corridor."
+3. Do NOT cite a document about a different highway as evidence for the queried highway.
+4. Do NOT infer that nearby flooding means the queried road is also flooded unless a document says so.
+5. Cite every factual claim with its document ID e.g. [DOC_F001].
+6. If evidence is partial (regional, not specific), say so clearly.
 
 ## Query
 {query}
 
-## Parsed Intent
+## Specific subject of query
+- Highway/Route: {highway}
 - Origin: {origin}
 - Destination: {destination}
 - Cargo: {cargo}
-- Urgency: {urgency}
 
-## Retrieved Evidence
+## Retrieved Evidence (use ONLY these)
 {evidence_text}
 
-## Instructions
-1. State the overall risk level: CRITICAL / HIGH / MEDIUM / LOW.
-2. State your recommended action (transport now / delay / use alternative route).
-3. Explain why, citing the evidence document IDs.
-4. If an alternative route is implied by the evidence, mention it.
-5. State what evidence was NOT available (if any).
-6. Keep the response concise — 150-200 words maximum.
+## Required output format
+**Overall Risk Level:** CRITICAL / HIGH / MEDIUM / LOW / INSUFFICIENT DATA
+
+**Recommended Action:** (one sentence — only if evidence directly supports it)
+
+**Explanation:** (cite specific doc IDs; if no direct evidence say so explicitly)
+
+**Missing Evidence:** (what specific data was not available)
+
+Keep under 200 words. If no document directly covers the queried subject, lead with that.
 """
 
 
@@ -61,9 +69,19 @@ def _format_evidence(bundle: EvidenceBundle, top_n: int = 5) -> str:
             f"  Source: {doc.source} ({doc.provenance})\n"
             f"  Date: {doc.date}  Location: {doc.location}\n"
             f"  Hazard: {doc.hazard}  Severity: {doc.severity}\n"
+            f"  Relevance score: {r.final_score:.2f}\n"
             f"  Text: {doc.text[:300]}\n"
         )
-    return "\n".join(lines) if lines else "No relevant evidence found."
+    if not lines:
+        return "NO EVIDENCE FOUND — corpus contains no documents matching this query."
+    return "\n".join(lines)
+
+
+def _extract_highway(query: str) -> str:
+    """Pull any NH/SH reference out of the raw query."""
+    import re
+    m = re.findall(r'\bNH\s*\d+\w*|\bSH\s*\d+\w*|\bNH\w+', query, re.IGNORECASE)
+    return ", ".join(m) if m else "not specified"
 
 
 # ── Provider 1: Groq (free tier) ──────────────────────────────────────
@@ -161,6 +179,7 @@ def generate_answer(bundle: EvidenceBundle) -> dict:
 
     prompt = _PROMPT_TEMPLATE.format(
         query=bundle.query,
+        highway=_extract_highway(bundle.query),
         origin=parsed.get("origin", "not specified"),
         destination=parsed.get("destination", "not specified"),
         cargo=parsed.get("cargo", "general"),

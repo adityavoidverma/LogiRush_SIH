@@ -256,6 +256,114 @@ def boolean_query():
 
 
 # ─────────────────────────────────────────────────────────────────
+# GET /api/ir/phrase?q=NH27+flooding
+# ─────────────────────────────────────────────────────────────────
+@ir_bp.route("/ir/phrase", methods=["GET"])
+def phrase_search():
+    """
+    Exact phrase search — consecutive token sequence.
+
+    ?q=NH27 flooding
+    ?q=Brahmaputra overflow
+    """
+    q = (request.args.get("q") or "").strip()
+    if not q:
+        return _err("'q' parameter is required")
+
+    ir_engine._ensure_built()
+    results = ir_engine._index.phrase_search(q)
+    return jsonify({
+        "status":  "success",
+        "phrase":  q,
+        "count":   len(results),
+        "results": [
+            {
+                "doc_id":          r["doc_id"],
+                "match_count":     r["match_count"],
+                "match_positions": r["match_positions"],
+                "snippet":         r["snippet"],
+                **r["document"].to_dict(),
+            }
+            for r in results
+        ],
+    })
+
+
+# ─────────────────────────────────────────────────────────────────
+# GET /api/ir/proximity?t1=flood&t2=Assam&window=10
+# ─────────────────────────────────────────────────────────────────
+@ir_bp.route("/ir/proximity", methods=["GET"])
+def proximity_search():
+    """
+    Proximity search — two terms within N tokens of each other.
+
+    ?t1=flood&t2=Guwahati&window=8
+    """
+    t1     = (request.args.get("t1") or "").strip()
+    t2     = (request.args.get("t2") or "").strip()
+    window = min(int(request.args.get("window", 10)), 50)
+
+    if not t1 or not t2:
+        return _err("'t1' and 't2' parameters are required")
+
+    ir_engine._ensure_built()
+    results = ir_engine._index.proximity_search(t1, t2, window=window)
+    return jsonify({
+        "status":  "success",
+        "term1":   t1,
+        "term2":   t2,
+        "window":  window,
+        "count":   len(results),
+        "results": [
+            {
+                "doc_id":       r["doc_id"],
+                "min_distance": r["min_distance"],
+                "snippet":      r["snippet"],
+                **r["document"].to_dict(),
+            }
+            for r in results
+        ],
+    })
+
+
+# ─────────────────────────────────────────────────────────────────
+# GET /api/ir/corpus  — browse all indexed documents
+# ─────────────────────────────────────────────────────────────────
+@ir_bp.route("/ir/corpus", methods=["GET"])
+def corpus_browser():
+    """
+    Return all indexed documents with optional filtering.
+
+    ?hazard=flood
+    ?state=Assam
+    ?provenance=SYNTHETIC
+    ?severity=high
+    """
+    ir_engine._ensure_built()
+    docs = ir_engine._index.all_documents()
+
+    hazard     = (request.args.get("hazard")     or "").lower()
+    state      = (request.args.get("state")      or "").lower()
+    provenance = (request.args.get("provenance") or "").upper()
+    severity   = (request.args.get("severity")   or "").lower()
+
+    if hazard:
+        docs = [d for d in docs if d.hazard.lower() == hazard]
+    if state:
+        docs = [d for d in docs if state in (d.state or "").lower()]
+    if provenance:
+        docs = [d for d in docs if d.provenance == provenance]
+    if severity:
+        docs = [d for d in docs if d.severity.lower() == severity]
+
+    return jsonify({
+        "status": "success",
+        "total":  len(docs),
+        "documents": [d.to_dict() for d in docs],
+    })
+
+
+# ─────────────────────────────────────────────────────────────────
 # GET /api/evaluation/results?method=hybrid&k=5
 # ─────────────────────────────────────────────────────────────────
 @ir_bp.route("/evaluation/results", methods=["GET"])
